@@ -10,10 +10,9 @@ command = "node src/build-html.js"
 name = "MCP_SESSION_MANAGER"
 class_name = "MCPSessionManager"
 
-# Migrations already applied in production (v1-v3)
-# No new migrations needed - MCPSessionManager already exists
 [[migrations]]
-tag = "v3"
+tag = "v1"
+new_sqlite_classes = ["MCPSessionManager"]
 
 [env.staging]
 name = "drawio-mcp-app-staging"
@@ -24,4 +23,4 @@ class_name = "MCPSessionManager"
 
 [[env.staging.migrations]]
 tag = "v1"
-new_classes = ["MCPSessionManager"]
+new_sqlite_classes = ["MCPSessionManager"]
