@@ -1,0 +1,51 @@
+{
+  "name": "@drawio/mcp",
+  "version": "1.2.6",
+  "description": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "drawio-mcp": "./src/index.js"
+  },
+  "scripts": {
+    "copy-shared": "cp ../shared/xml-reference.md src/xml-reference.md && cp ../shared/mermaid-reference.md src/mermaid-reference.md && cp ../postprocessor/postprocess.js src/postprocessor/postprocess.js",
+    "start": "node src/index.js",
+    "prestart": "npm run copy-shared",
+    "prepack": "npm run copy-shared"
+  },
+  "keywords": [
+    "mcp",
+    "drawio",
+    "draw.io",
+    "diagrams",
+    "mermaid",
+    "csv",
+    "xml",
+    "llm",
+    "claude",
+    "anthropic"
+  ],
+  "author": "JGraph Ltd",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jgraph/drawio-mcp.git"
+  },
+  "homepage": "https://github.com/jgraph/drawio-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/jgraph/drawio-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@xmldom/xmldom": "^0.9.8",
+    "pako": "^2.1.0"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ]
+}

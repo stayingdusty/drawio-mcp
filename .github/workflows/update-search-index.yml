@@ -1,0 +1,48 @@
+name: Update Shape Search Index
+
+on:
+  repository_dispatch:
+    types: [drawio-release]
+  workflow_dispatch:
+
+jobs:
+  update-index:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: cd shape-search && npm ci
+
+      - name: Generate search index
+        run: cd shape-search && npm run generate
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet shape-search/search-index.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: update shape search index"
+          branch: update-search-index
+          title: "chore: update shape search index"
+          body: |
+            Auto-generated after a new draw.io release.
+
+            Triggered by: `${{ github.event_name }}` ${{ github.event.client_payload.tag && format('(tag: {0})', github.event.client_payload.tag) || '' }}
+          delete-branch: true

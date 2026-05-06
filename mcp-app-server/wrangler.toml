@@ -1,0 +1,27 @@
+name = "drawio-mcp-app"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "node src/build-html.js"
+
+[[durable_objects.bindings]]
+name = "MCP_SESSION_MANAGER"
+class_name = "MCPSessionManager"
+
+# Migrations already applied in production (v1-v3)
+# No new migrations needed - MCPSessionManager already exists
+[[migrations]]
+tag = "v3"
+
+[env.staging]
+name = "drawio-mcp-app-staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "MCP_SESSION_MANAGER"
+class_name = "MCPSessionManager"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_classes = ["MCPSessionManager"]
