@@ -16,7 +16,7 @@ const CORS_HEADERS =
 {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, mcp-session-id, mcp-protocol-version",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, mcp-session-id, mcp-protocol-version",
   "Access-Control-Expose-Headers": "mcp-session-id, mcp-protocol-version",
 };
 
@@ -340,6 +340,130 @@ export class MCPSessionManager
 }
 
 /**
+ * Build OAuth 2.0 Authorization Server Metadata for the given base URL.
+ * Enables MCP clients that require OAuth (e.g. Copilot Studio) to discover
+ * the auth endpoints. Since this server is public and needs no real auth,
+ * the flow issues tokens without requiring credentials.
+ */
+function buildOAuthMetadata(baseUrl)
+{
+  return {
+    issuer: baseUrl,
+    authorization_endpoint: baseUrl + "/oauth/authorize",
+    token_endpoint: baseUrl + "/oauth/token",
+    registration_endpoint: baseUrl + "/oauth/register",
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["none"],
+    scopes_supported: ["mcp"],
+  };
+}
+
+/**
+ * Handle GET /.well-known/oauth-authorization-server
+ * Required by OAuth 2.0 clients (e.g. Copilot Studio) for server discovery.
+ */
+function handleOAuthMetadata(request)
+{
+  const url = new URL(request.url);
+  const baseUrl = url.origin;
+  return new Response(JSON.stringify(buildOAuthMetadata(baseUrl)),
+  {
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
+}
+
+/**
+ * Handle POST /oauth/register (RFC 7591 Dynamic Client Registration).
+ * Returns a public client ID so any OAuth client can register.
+ */
+async function handleOAuthRegister(request)
+{
+  let body = {};
+
+  try
+  {
+    body = await request.json();
+  }
+  catch (e) { /* ignore malformed body */ }
+
+  const registration =
+  {
+    client_id: "drawio-mcp-public-client",
+    client_secret: "drawio-mcp-public-secret",
+    redirect_uris: body.redirect_uris || [],
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    client_name: body.client_name || "draw.io MCP Client",
+  };
+
+  return new Response(JSON.stringify(registration),
+  {
+    status: 201,
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
+}
+
+/**
+ * Handle GET /oauth/authorize
+ * Immediately redirects to redirect_uri with an authorization code.
+ * No login required — this server is public.
+ */
+function handleOAuthAuthorize(request)
+{
+  const url = new URL(request.url);
+  const redirectUri = url.searchParams.get("redirect_uri");
+  const state = url.searchParams.get("state");
+
+  if (!redirectUri)
+  {
+    return new Response("Missing redirect_uri", { status: 400, headers: CORS_HEADERS });
+  }
+
+  let callbackUrl;
+
+  try
+  {
+    callbackUrl = new URL(redirectUri);
+  }
+  catch (e)
+  {
+    return new Response("Invalid redirect_uri", { status: 400, headers: CORS_HEADERS });
+  }
+
+  callbackUrl.searchParams.set("code", "drawio-mcp-auth-code");
+
+  if (state)
+  {
+    callbackUrl.searchParams.set("state", state);
+  }
+
+  return Response.redirect(callbackUrl.toString(), 302);
+}
+
+/**
+ * Handle POST /oauth/token
+ * Accepts any authorization code and returns a public bearer token.
+ */
+async function handleOAuthToken()
+{
+  const token =
+  {
+    access_token: "drawio-mcp-public-token",
+    token_type: "bearer",
+    expires_in: 86400,
+    scope: "mcp",
+  };
+
+  return new Response(JSON.stringify(token),
+  {
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
+}
+
+/**
  * Number of Durable Object shards to spread sessions across.
  * Sessions are routed to a shard based on the first hex char of the session ID.
  */
@@ -392,6 +516,27 @@ export default
           ...CORS_HEADERS,
         },
       });
+    }
+
+    // OAuth 2.0 endpoints (required by Copilot Studio and other OAuth-enforcing MCP clients)
+    if (url.pathname === "/.well-known/oauth-authorization-server")
+    {
+      return handleOAuthMetadata(request);
+    }
+
+    if (url.pathname === "/oauth/register" && request.method === "POST")
+    {
+      return handleOAuthRegister(request);
+    }
+
+    if (url.pathname === "/oauth/authorize")
+    {
+      return handleOAuthAuthorize(request);
+    }
+
+    if (url.pathname === "/oauth/token" && request.method === "POST")
+    {
+      return handleOAuthToken();
     }
 
     // Only serve /mcp
